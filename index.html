@@ -82,6 +82,9 @@ main>*{position:relative;z-index:1}
 #toast.on{opacity:1}
 .empty{color:var(--mut);font-size:13px;padding:18px;text-align:center}
 .photo{max-width:140px;border-radius:10px;display:block;margin-top:6px}
+.cfitem{border:1px solid #2c2c2c;border-radius:12px;padding:12px;margin:8px 0}
+.cfitem.ok{border-color:#2e5c34;background:#1a241b}
+.cfitem.no{border-color:#5c3a2e;background:#241d1a}
 @media(min-width:700px){nav{position:fixed;left:0;width:230px}#scrim{display:none}main{margin-left:230px}header{margin-left:230px}}
 </style>
 </head>
@@ -434,33 +437,116 @@ async function pagAvisosGestao(el){
   });
 }
 /* ============ PÁGINAS — CONFERENTE/GERÊNCIA ============ */
+const CONF_ITENS=['Motorista retornou?','Roteiro informado corretamente?','Todas as notas/canhotos entregues?','Comprovantes anexados?','Divergência ou ocorrência?'];
 PAGES.conferencia=async el=>{
   el.innerHTML=`<h1 class="pg">Conferência de jornadas</h1><div id="cf">${empty('Carregando…')}</div>`;
   const {data:lista}=await sb.from('jornadas').select('*, veiculos(placa,modelo), motoristas(nome)').eq('status','conferencia').order('fim',{ascending:false}).limit(100);
   const c=$('cf');
   if(!lista||!lista.length){c.innerHTML=empty('Nenhuma jornada aguardando conferência 🎉');return}
-  const ITENS=['Motorista retornou?','Roteiro informado corretamente?','Todas as notas/canhotos entregues?','Comprovantes anexados?','Divergência ou ocorrência?'];
-  c.innerHTML=`<div class="hint" style="margin-bottom:10px">Marque cada item. A jornada só fecha com todos conferidos.</div>`+lista.map(j=>`
-  <div class="sec" data-j="${j.id}">
-    <h3>${esc(j.motoristas?.nome)} · ${esc(j.veiculos?.placa)} · Roteiro ${j.roteiro}</h3>
-    <p class="hint">Saída ${fmtDT(j.inicio)} · Chegada ${fmtDT(j.fim)} · ${km(j.km_inicial)} → ${km(j.km_final)}</p>
-    ${j.ocorrencias?`<p style="font-size:13px;margin-top:6px">⚠️ ${esc(j.ocorrencias)}</p>`:''}
-    ${ITENS.map((it,i)=>`<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" class="cf-item" data-j="${j.id}" data-i="${i}"> ${it}</label>`).join('')}
-    <button class="btn" data-close="${j.id}">✓ Fechar jornada</button><div class="msg" id="cfm-${j.id}"></div>
-  </div>`).join('');
-  c.querySelectorAll('[data-close]').forEach(b=>b.onclick=async()=>{
-    const jid=b.dataset.close;
-    const boxes=[...c.querySelectorAll(`.cf-item[data-j="${jid}"]`)];
-    const marcados=boxes.filter(x=>x.checked).length;
-    if(marcados<boxes.length){$('cfm-'+jid).className='msg err';$('cfm-'+jid).textContent='Faltam itens do checklist ('+marcados+'/'+boxes.length+')';return}
-    // grava checklist (upsert por jornada+item) e fecha
-    for(let i=0;i<boxes.length;i++){
-      const {error}=await sb.from('jornada_conferencia').upsert({jornada_id:jid,item:ITENS[i],ok:boxes[i].checked,conferido_por:ME.id,conferido_em:new Date().toISOString()});
-      if(error){$('cfm-'+jid).className='msg err';$('cfm-'+jid).textContent=err(error);return}
-    }
+  const {data:checks}=await sb.from('jornada_conferencia').select('jornada_id,ok');
+  const prog={};(checks||[]).forEach(x=>{if(x.ok===true)prog[x.jornada_id]=(prog[x.jornada_id]||0)+1});
+  c.innerHTML=lista.map(j=>{
+    const kmP=j.km_final!=null?Math.round(Number(j.km_final)-Number(j.km_inicial)):null;
+    const p=prog[j.id]||0;
+    return `<div class="sec">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div><b style="font-size:15px">${esc(j.motoristas?.nome)}</b><div class="hint">${esc(j.veiculos?.placa)} · Roteiro ${j.roteiro}</div></div>
+        ${j.ocorrencias?'<span class="tag reprovada">⚠ ocorrência</span>':`<span class="tag conferencia">${p}/5</span>`}
+      </div>
+      <div class="row" style="margin-top:10px;font-size:12px;color:var(--mut)"><div>📅 ${fmtDT(j.inicio)}</div><div>🏁 ${fmtDT(j.fim)}</div></div>
+      <div class="row" style="margin-top:4px;font-size:12px;color:var(--mut)"><div>🛣️ ${km(j.km_inicial)} → ${km(j.km_final)}</div><div><b style="color:var(--ink)">${kmP!=null?kmP.toLocaleString('pt-BR')+' km percorridos':'—'}</b></div></div>
+      <div style="background:#262626;border-radius:8px;height:6px;margin-top:10px;overflow:hidden"><div style="width:${Math.round(p/5*100)}%;height:100%;background:var(--acc)"></div></div>
+      <button class="btn" data-open="${j.id}" style="margin-top:12px">📋 Abrir conferência</button>
+    </div>`}).join('');
+  c.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>pagConfDetalhe(el,b.dataset.open));
+};
+async function pagConfDetalhe(el,jid){
+  el.innerHTML=`<h1 class="pg">Conferência</h1><div id="cfd">${empty('Carregando…')}</div>`;
+  const d=$('cfd');
+  const {data:j}=await sb.from('jornadas').select('*, veiculos(placa,modelo), motoristas(nome)').eq('id',jid).maybeSingle();
+  if(!j){d.innerHTML=empty('Jornada não encontrada');return}
+  const {data:checks}=await sb.from('jornada_conferencia').select('*').eq('jornada_id',jid);
+  const estado={};(checks||[]).forEach(x=>estado[x.item]={ok:x.ok,obs:x.obs||''});
+  const [abs,dsp]=await Promise.all([
+    sb.from('abastecimentos').select('posto,litros,valor_total,foto_path').eq('jornada_id',jid),
+    sb.from('despesas').select('categoria,valor,foto_path').eq('jornada_id',jid)
+  ]);
+  const comps=[
+    ...(abs.data||[]).map(a=>({t:'⛽ Abastecimento — '+(a.posto||'posto'),s:`${a.litros} L · ${fmtBRL(a.valor_total)}`,p:a.foto_path})),
+    ...(dsp.data||[]).map(x=>({t:'💰 '+x.categoria,s:fmtBRL(x.valor),p:x.foto_path}))
+  ];
+  const kmP=j.km_final!=null?Math.round(Number(j.km_final)-Number(j.km_inicial)):null;
+  d.innerHTML=`
+  <button class="btn sec" id="cf-voltar" style="margin-top:0">← Voltar para a lista</button>
+  <div class="sec" style="margin-top:12px">
+    <b style="font-size:16px">${esc(j.motoristas?.nome)}</b>
+    <div class="hint">${esc(j.veiculos?.placa)} — ${esc(j.veiculos?.modelo||'')} · Roteiro ${j.roteiro}</div>
+    <div class="row" style="margin-top:10px;font-size:13px"><div>📅 Saída<br>${fmtDT(j.inicio)}</div><div>🏁 Chegada<br>${fmtDT(j.fim)}</div></div>
+    <div class="row" style="margin-top:8px;font-size:13px"><div>🛣️ Km<br>${km(j.km_inicial)} → ${km(j.km_final)}</div><div>📏 Percorridos<br><b style="color:var(--acc)">${kmP!=null?kmP.toLocaleString('pt-BR')+' km':'—'}</b></div></div>
+    ${j.ocorrencias?`<div style="margin-top:10px;background:#241d1a;border:1px solid #5c3a2e;border-radius:10px;padding:10px;font-size:13px">⚠️ <b>Ocorrência do motorista:</b><br>${esc(j.ocorrencias)}</div>`:''}
+  </div>
+  <div class="sec"><h3>Comprovantes da jornada (${comps.length})</h3><div id="cf-comps">${comps.length?'':empty('Nenhum comprovante anexado a esta jornada')}</div></div>
+  <div class="sec"><h3>Checklist de conferência</h3><div id="cf-itens"></div>
+    <div style="margin-top:12px;font-size:12px;color:var(--mut)" id="cf-prog"></div>
+    <button class="btn" id="cf-fechar" style="margin-top:10px">✓ Fechar jornada</button>
+    <div class="msg" id="cf-msg"></div>
+  </div>`;
+  $('cf-voltar').onclick=()=>go('conferencia');
+  const cw=$('cf-comps');
+  for(const cpt of comps){
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #242424;font-size:13px';
+    div.innerHTML=`<div>${esc(cpt.t)}<div class="hint">${esc(cpt.s)}</div></div>`;
+    const btn=document.createElement('button');btn.className='btn mini';btn.textContent='👁 foto';
+    btn.onclick=async()=>{const url=await assinar(cpt.p);if(url)window.open(url,'_blank');else toast('Foto não encontrada')};
+    div.appendChild(btn);cw.appendChild(div);
+  }
+  const iw=$('cf-itens');
+  const renderItens=()=>{
+    iw.innerHTML=CONF_ITENS.map((it,i)=>{
+      const st=estado[it]||{};
+      const cls=st.ok===true?'cfitem ok':st.ok===false?'cfitem no':'cfitem';
+      return `<div class="${cls}" data-i="${i}">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+          <b style="font-size:13px">${i+1}. ${it}</b>
+          <div style="display:flex;gap:6px">
+            <button class="btn mini" data-ok="${i}" style="margin-top:0">✓</button>
+            <button class="btn mini" data-no="${i}" style="margin-top:0">✗</button>
+          </div>
+        </div>
+        ${st.ok===false?`<textarea data-obs="${i}" placeholder="O que está pendente? (salva automático)" style="margin-top:8px">${esc(st.obs||'')}</textarea>`:''}
+      </div>`}).join('');
+    iw.querySelectorAll('[data-ok]').forEach(b=>b.onclick=async()=>{
+      const it=CONF_ITENS[b.dataset.ok];
+      const {error}=await sb.from('jornada_conferencia').upsert({jornada_id:jid,item:it,ok:true,obs:null,conferido_por:ME.id,conferido_em:new Date().toISOString()});
+      if(error){toast(err(error));return}
+      estado[it]={ok:true,obs:''};renderItens();atualizaProg();
+    });
+    iw.querySelectorAll('[data-no]').forEach(b=>b.onclick=async()=>{
+      const it=CONF_ITENS[b.dataset.no];
+      const {error}=await sb.from('jornada_conferencia').upsert({jornada_id:jid,item:it,ok:false,obs:'',conferido_por:ME.id,conferido_em:new Date().toISOString()});
+      if(error){toast(err(error));return}
+      estado[it]={ok:false,obs:''};renderItens();atualizaProg();
+    });
+    iw.querySelectorAll('[data-obs]').forEach(t=>t.addEventListener('change',async()=>{
+      const it=CONF_ITENS[t.dataset.obs];
+      estado[it].obs=t.value;
+      const {error}=await sb.from('jornada_conferencia').upsert({jornada_id:jid,item:it,ok:false,obs:t.value,conferido_por:ME.id,conferido_em:new Date().toISOString()});
+      if(error)toast(err(error));
+    }));
+  };
+  const atualizaProg=()=>{
+    const ok=CONF_ITENS.filter(it=>estado[it]&&estado[it].ok===true).length;
+    const no=CONF_ITENS.filter(it=>estado[it]&&estado[it].ok===false).length;
+    $('cf-prog').textContent=`${ok}/5 conferidos${no?` · ${no} pendente(s) — fica registrado quem marcou e quando`:''}`;
+    $('cf-fechar').disabled=ok<5;
+    $('cf-fechar').textContent=ok<5?`Faltam ${5-ok} item(ns)`:'✓ Fechar jornada';
+  };
+  renderItens();atualizaProg();
+  $('cf-fechar').onclick=async()=>{
     const r=await upd('jornadas',jid,{status:'fechada',conferida_por:ME.id,conferida_em:new Date().toISOString()});
-    if(r){toast('Jornada fechada');go('conferencia')}
-  });
+    if(r){toast('Jornada fechada ✓');go('conferencia')}
+  };
 };
 PAGES.abastecimentos=async el=>{
   el.innerHTML=`<h1 class="pg">Abastecimentos</h1><div id="ab-f" class="sec"><h3>Filtros</h3><div class="row"><div><label>De</label><input id="f-de" type="date" value=""></div><div><label>Até</label><input id="f-ate" type="date" value=""></div></div><button class="btn mini" id="f-btn">Filtrar</button></div><div id="ab-l">${empty('Carregando…')}</div>`;
