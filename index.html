@@ -92,7 +92,7 @@ main>*{position:relative;z-index:1}
 <div class="wm"><img src="logo-branca.png" alt=""></div>
 <div id="login">
   <img class="logo" src="logo-branca.png" alt="Ovos Casagrande">
-  <div class="card">
+  <div class="card" id="card-login">
     <h2>Gestão de Frota</h2>
     <label>Usuário</label>
     <input id="li-email" type="email" placeholder="email@casagrande" autocomplete="username">
@@ -103,6 +103,16 @@ main>*{position:relative;z-index:1}
     <div class="hint" style="font-size:11px;color:var(--mut);margin-top:8px">Primeiro acesso vira GERÊNCIA automaticamente</div>
     <button class="btn sec" id="li-cfg" style="margin-top:10px">⚙️ Configurar conexão</button>
     <div class="msg" id="cfg-msg"></div>
+    <button class="btn sec" id="li-criar" style="margin-top:10px">➕ Criar conta (equipe)</button>
+  </div>
+  <div class="card hide" id="card-criar">
+    <h2>Criar conta</h2>
+    <label>Seu nome</label><input id="cr-nome" placeholder="nome completo">
+    <label>Email</label><input id="cr-email" type="email" autocomplete="username">
+    <label>Senha (mín. 6)</label><input id="cr-pass" type="password" autocomplete="new-password">
+    <button class="btn" id="cr-btn">Criar minha conta</button>
+    <div class="msg" id="cr-msg"></div>
+    <button class="btn sec" id="cr-voltar" style="margin-top:10px">← Voltar para o login</button>
   </div>
 </div>
 <div id="app" class="hide">
@@ -178,6 +188,20 @@ $('li-cfg').onclick=async()=>{
 };
 $('li-btn').onclick=login;
 $('li-pass').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+$('li-criar').onclick=()=>{$('card-login').classList.add('hide');$('card-criar').classList.remove('hide');$('cr-msg').textContent=''};
+$('cr-voltar').onclick=()=>{$('card-criar').classList.add('hide');$('card-login').classList.remove('hide')};
+$('cr-btn').onclick=async()=>{
+  const nome=$('cr-nome').value.trim(),email=$('cr-email').value.trim(),pass=$('cr-pass').value;
+  if(!nome||!email||pass.length<6){$('cr-msg').className='msg err';$('cr-msg').textContent='Preencha nome, email e senha (mín. 6 caracteres)';return}
+  $('cr-btn').disabled=true;
+  try{
+    const {error}=await sb.auth.signUp({email,password:pass});
+    if(error)throw error;
+    $('card-criar').classList.add('hide');$('card-login').classList.remove('hide');
+    $('li-msg').className='msg ok';$('li-msg').textContent='Conta criada! A gerência vai definir seu perfil — depois feche e reabra o app.';
+  }catch(e){$('cr-msg').className='msg err';$('cr-msg').textContent=err(e)}
+  $('cr-btn').disabled=false;
+};
 async function login(){
   const email=$('li-email').value.trim(), pass=$('li-pass').value;
   if(!email||!pass){$('li-msg').className='msg err';$('li-msg').textContent='Preencha usuário e senha';return}
@@ -213,6 +237,7 @@ async function afterLogin(){
 function logout(){sb.auth.signOut().then(()=>location.reload())}
 /* ============ navegação ============ */
 const MENUS={
+  pendente:['home'],
   gerencia:['home','veiculos','motoristas','jornadas','conferencia','abastecimentos','despesas','avisos','os','multas','documentos','usuarios','auditoria'],
   motorista:['home','jornada','gastos','avisos','multas','documentos'],
   conferente:['home','conferencia','despesas','avisos','multas'],
@@ -296,6 +321,11 @@ async function comprimir(file){
 }
 /* ============ PÁGINAS — MOTORISTA ============ */
 PAGES.home=async el=>{
+  if(ME.perfil==='pendente'){
+    el.innerHTML=`<div class="sec"><h3>⏳ Aguardando liberação</h3><p class="hint">Sua conta foi criada, mas a gerência ainda não definiu seu perfil. Depois de liberado, feche e reabra o app.</p></div>`;
+    const b=document.createElement('button');b.className='btn sec';b.textContent='🚪 Sair';b.onclick=logout;el.appendChild(b);
+    return;
+  }
   if(ME.perfil==='motorista')return PAGES.jornada(el);
   if(ME.perfil==='mecanico')return PAGES.os(el);
   if(ME.perfil==='conferente')return PAGES.conferencia(el);
@@ -731,9 +761,19 @@ PAGES.motoristas=async el=>{
   const hojeStr=hoje();
   l.innerHTML=`<div class="tblwrap"><table><tr><th>Nome</th><th>CPF</th><th>CNH</th><th>Validade</th><th>Situação</th><th></th></tr>
   ${lista.map(m=>{const venc=m.cnh_validade&&m.cnh_validade<hojeStr;return `<tr><td><b>${esc(m.nome)}</b></td><td>${esc(m.cpf||'—')}</td><td>${esc(m.cnh||'—')}</td><td style="${venc?'color:var(--bad)':''}">${fmtD(m.cnh_validade)}${venc?' ⚠️':''}</td><td>${m.situacao==='completo'?'<span class="tag aprovada">completo</span>':'<span class="tag aguardando">incompleto</span>'}</td>
-  <td>${ME.perfil==='gerencia'?`<button class="btn mini" data-tg="${m.id}" data-a="${m.ativo?0:1}">${m.ativo?'Inativar':'Reativar'}</button>`:''}</td></tr>`}).join('')}</table></div>`;
+  <td>${ME.perfil==='gerencia'?`<button class="btn mini" data-ed="${m.id}">✏️</button> <button class="btn mini" data-tg="${m.id}" data-a="${m.ativo?0:1}">${m.ativo?'Inativar':'Reativar'}</button>`:''}</td></tr>`}).join('')}</table></div>`;
   l.querySelectorAll('[data-tg]').forEach(b=>b.onclick=async()=>{
     if(await upd('motoristas',b.dataset.tg,{ativo:b.dataset.a==='1'}))go('motoristas');
+  });
+  l.querySelectorAll('[data-ed]').forEach(b=>b.onclick=async()=>{
+    const m=(lista||[]).find(x=>x.id===b.dataset.ed);if(!m)return;
+    const cpf=prompt('CPF:',m.cpf||'');if(cpf===null)return;
+    const cnh=prompt('CNH:',m.cnh||'');if(cnh===null)return;
+    const cat=prompt('Categoria da CNH:',m.cnh_categoria||'');if(cat===null)return;
+    const val=prompt('Validade da CNH (AAAA-MM-DD):',m.cnh_validade||'');if(val===null)return;
+    const cont=prompt('Contato:',m.contato||'');if(cont===null)return;
+    const sit=(cpf&&cnh&&val)?'completo':'incompleto';
+    if(await upd('motoristas',m.id,{cpf:cpf||null,cnh:cnh||null,cnh_categoria:cat||null,cnh_validade:val||null,contato:cont||null,situacao:sit}))go('motoristas');
   });
 };
 PAGES.jornadas=async el=>{
@@ -791,6 +831,7 @@ PAGES.usuarios=async el=>{
   <div class="row"><div><label>UUID do usuário</label><input id="u-id" placeholder="xxxxxxxx-xxxx-..."></div><div><label>Nome</label><input id="u-nome"></div></div>
   <div class="row"><div><label>Perfil</label><select id="u-perfil">${opt([['gerencia','Gerência'],['motorista','Motorista'],['conferente','Conferente'],['mecanico','Mecânico']],null)}</select></div><div><label>&nbsp;</label><button class="btn" id="u-btn">Vincular</button></div></div>
   <div class="msg" id="u-msg"></div></div>
+  <div id="u-pend"></div>
   <div id="u-list">${empty('Carregando…')}</div>`;
   $('u-btn').onclick=async()=>{
     const id=$('u-id').value.trim(),nome=$('u-nome').value.trim();
@@ -808,6 +849,21 @@ PAGES.usuarios=async el=>{
   l.querySelectorAll('[data-up]').forEach(b=>b.onclick=async()=>{
     if(await upd('usuarios',b.dataset.up,{perfil:b.dataset.p}))go('usuarios');
   });
+  const pend=(lista||[]).filter(u=>u.perfil==='pendente');
+  const pw=$('u-pend');
+  if(pend.length){
+    pw.innerHTML=`<div class="sec"><h3>⏳ Aguardando aprovação (${pend.length})</h3>`+pend.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #242424;font-size:13px"><div><b>${esc(u.nome)}</b><div class="hint">criou conta em ${fmtDT(u.criado_em)}</div></div><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="btn mini" data-prom="${u.id}" data-p="motorista">Motorista</button><button class="btn mini" data-prom="${u.id}" data-p="conferente">Conferente</button><button class="btn mini" data-prom="${u.id}" data-p="mecanico">Mecânico</button></div></div>`).join('')+`</div>`;
+    pw.querySelectorAll('[data-prom]').forEach(b=>b.onclick=async()=>{
+      const p=b.dataset.p,id=b.dataset.prom;
+      const r=await upd('usuarios',id,{perfil:p});
+      if(!r)return;
+      if(p==='motorista'){
+        const {data:mex}=await sb.from('motoristas').select('id').eq('usuario_id',id).maybeSingle();
+        if(!mex){const u=(lista||[]).find(x=>x.id===id);await ins('motoristas',{nome:u?u.nome:'Motorista',usuario_id:id,situacao:'incompleto'})}
+      }
+      toast('Perfil definido: '+p);go('usuarios');
+    });
+  }else{pw.innerHTML=''}
 };
 PAGES.auditoria=async el=>{
   el.innerHTML=`<h1 class="pg">Auditoria</h1><div id="au">${empty('Carregando…')}</div>`;
