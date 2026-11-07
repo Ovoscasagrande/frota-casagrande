@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Frota Casagrande</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="favicon.png">
+<meta name="theme-color" content="#141414">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{--bg:#141414;--card:#1e1e1e;--field:#2a2a2a;--ink:#f5f5f5;--mut:#9a9a9a;--acc:#fcc85c;--ok:#4caf50;--bad:#e05252}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;min-height:100dvh}
+#app{max-width:1100px;margin:0 auto}
+.hide{display:none!important}
+/* ---------- login ---------- */
+#login{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#login img.logo{width:min(320px,78vw);margin-bottom:36px}
+.card{background:var(--card);border-radius:16px;padding:22px;width:100%;max-width:380px}
+.card h2{font-size:17px;margin-bottom:16px;color:var(--ink)}
+label{display:block;font-size:12px;color:var(--mut);margin:12px 0 6px}
+input,select,textarea{width:100%;background:var(--field);border:1px solid #3a3a3a;border-radius:10px;padding:12px;font-size:15px;color:var(--ink);outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+textarea{resize:vertical;min-height:70px}
+button{font-family:inherit;cursor:pointer}
+.btn{width:100%;background:var(--acc);color:#141414;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;margin-top:18px}
+.btn.sec{background:var(--field);color:var(--ink);font-weight:600}
+.btn.mini{width:auto;padding:8px 14px;font-size:13px;margin-top:0;border-radius:9px}
+.btn:disabled{opacity:.5}
+.msg{font-size:13px;margin-top:10px;min-height:16px}
+.msg.err{color:var(--bad)}.msg.ok{color:var(--ok)}
+/* ---------- shell ---------- */
+header{position:sticky;top:0;z-index:20;background:rgba(20,20,20,.94);backdrop-filter:blur(8px);padding:12px 16px;display:flex;align-items:center;gap:12px;padding-top:calc(12px + env(safe-area-inset-top))}
+header img{height:30px}
+header .tt{font-weight:700;font-size:15px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.burger{background:none;border:none;color:var(--ink);font-size:22px;line-height:1;padding:4px 8px}
+.bell{position:relative;background:none;border:none;font-size:20px;color:var(--ink)}
+.bell .bdg{position:absolute;top:-4px;right:-6px;background:var(--bad);color:#fff;font-size:10px;font-weight:700;border-radius:8px;padding:1px 5px}
+nav{position:fixed;top:0;left:-260px;width:250px;height:100vh;height:100dvh;background:#101010;z-index:40;transition:left .25s;padding:calc(16px + env(safe-area-inset-top)) 12px 16px;overflow-y:auto}
+nav.open{left:0}
+nav .who{font-size:13px;color:var(--mut);padding:8px 10px 14px;border-bottom:1px solid #262626;margin-bottom:8px}
+nav button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--ink);padding:11px 12px;border-radius:10px;font-size:14px}
+nav button.on{background:#262626;color:var(--acc)}
+#scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:35}
+main{padding:16px;padding-bottom:80px}
+h1.pg{font-size:19px;margin-bottom:14px}
+/* ---------- componentes ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.tile{background:var(--card);border-radius:16px;padding:18px 14px;text-align:center;font-size:14px;font-weight:600;border:none;color:var(--ink);display:flex;flex-direction:column;gap:8px;align-items:center}
+.tile .em{font-size:28px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--card);border-radius:14px;padding:14px}
+.kpi .v{font-size:22px;font-weight:800;color:var(--acc)}
+.kpi .l{font-size:11px;color:var(--mut);margin-top:3px}
+.tblwrap{overflow-x:auto;background:var(--card);border-radius:14px;padding:4px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{color:var(--mut);text-align:left;font-weight:600;padding:9px 10px;border-bottom:1px solid #2c2c2c;white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid #242424;vertical-align:top}
+tr:last-child td{border-bottom:none}
+.tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.tag.aberta{background:#3a2f14;color:var(--acc)}
+.tag.conferencia{background:#14304a;color:#7db8e8}
+.tag.fechada{background:#1c3320;color:#7fd88f}
+.tag.aguardando,.tag.recebida,.tag.recebido,.tag.aguardando_ciencia{background:#3a2f14;color:var(--acc)}
+.tag.aprovada,.tag.fechada,.tag.resolvida,.tag.concluida{background:#1c3320;color:#7fd88f}
+.tag.reprovada{background:#3a1a1a;color:#e88}
+.tag.em_analise,.tag.em_execucao,.tag.encaminhado,.tag.ciente,.tag.providencia{background:#14304a;color:#7db8e8}
+.tag.aguardando_peca{background:#3a2f14;color:var(--acc)}
+.tag.arquivado{background:#2a2a2a;color:#888}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.sec{background:var(--card);border-radius:14px;padding:16px;margin-bottom:14px}
+.sec h3{font-size:14px;margin-bottom:10px}
+.sec .hint{font-size:12px;color:var(--mut)}
+.wm{position:fixed;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;z-index:0;opacity:.06}
+.wm img{width:min(72vw,600px);filter:brightness(10)}
+main>*{position:relative;z-index:1}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:#2e2e2e;color:#fff;padding:11px 18px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:opacity .25s;pointer-events:none;max-width:88vw}
+#toast.on{opacity:1}
+.empty{color:var(--mut);font-size:13px;padding:18px;text-align:center}
+.photo{max-width:140px;border-radius:10px;display:block;margin-top:6px}
+@media(min-width:700px){nav{position:fixed;left:0;width:230px}#scrim{display:none}main{margin-left:230px}header{margin-left:230px}}
+</style>
+</head>
+<body>
+<div class="wm"><img src="logo-branca.png" alt=""></div>
+<div id="login">
+  <img class="logo" src="logo-branca.png" alt="Ovos Casagrande">
+  <div class="card">
+    <h2>Gestão de Frota</h2>
+    <label>Usuário</label>
+    <input id="li-email" type="email" placeholder="email@casagrande" autocomplete="username">
+    <label>Senha</label>
+    <input id="li-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    <button class="btn" id="li-btn">Entrar</button>
+    <div class="msg" id="li-msg"></div>
+    <div class="hint" style="font-size:11px;color:var(--mut);margin-top:8px">Primeiro acesso vira GERÊNCIA automaticamente</div>
+    <button class="btn sec" id="li-cfg" style="margin-top:10px">⚙️ Configurar conexão</button>
+    <div class="msg" id="cfg-msg"></div>
+  </div>
+</div>
+<div id="app" class="hide">
+  <header>
+    <button class="burger" id="burger">☰</button>
+    <img src="logo-branca.png" alt="">
+    <div class="tt" id="pg-title">Início</div>
+    <button class="bell" id="bell">🔔<span class="bdg hide" id="bdg">0</span></button>
+  </header>
+  <div id="scrim" class="hide"></div>
+  <nav id="nav"></nav>
+  <main id="main"></main>
+</div>
+<div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js'))}
+</script>
+<script>
+'use strict';
+/* ============ conexão ============ */
+const SUPABASE_URL_KEY='fc_url', SUPABASE_ANON_KEY='fc_anon';
+let sb=null;
+function api(){return sb}
+function loadConn(){return{url:localStorage.getItem(SUPABASE_URL_KEY)||'',anon:localStorage.getItem(SUPABASE_ANON_KEY)||''}}
+function saveConn(url,anon){localStorage.setItem(SUPABASE_URL_KEY,url.trim());localStorage.setItem(SUPABASE_ANON_KEY,anon.trim());sb=window.supabase.createClient(url.trim(),anon.trim())}
+function hasConn(){const c=loadConn();return !!(c.url&&c.anon)}
+function ensureClient(){if(!sb&&hasConn())saveConn(loadConn().url,loadConn().anon);return sb}
+/* ============ estado ============ */
+let ME=null, NAV=[], PAGE='home';
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.remove('on'),2600)}
+function fmt(v){return v==null||v===''?'—':v}
+function fmtD(d){if(!d)return'—';const x=new Date(d);return x.toLocaleDateString('pt-BR')}
+function fmtDT(d){if(!d)return'—';const x=new Date(d);return x.toLocaleDateString('pt-BR')+' '+x.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+function fmtBRL(v){return v==null?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function km(v){return v==null?'—':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0})+' km'}
+function hoje(){return new Date().toISOString().slice(0,10)}
+function tag(s){return s?`<span class="tag ${esc(s)}">${esc(s.replace(/_/g,' '))}</span>`:'—'}
+function opt(list,sel){return list.map(o=>`<option value="${esc(o[0])}" ${o[0]==sel?'selected':''}>${esc(o[1])}</option>`).join('')}
+function empty(t){return `<div class="empty">${t}</div>`}
+function err(e){return (e&&e.message)?e.message:'Erro inesperado'}
+/* ============ boot ============ */
+window.addEventListener('load',init);
+async function init(){
+  if(!ensureClient()){showCfg();return}
+  const {data} = await sb.auth.getSession();
+  if(data.session){await afterLogin()}else{showLogin()}
+}
+async function showLogin(){
+  $('app').classList.add('hide');$('login').classList.remove('hide');
+  $('li-msg').textContent=hasConn()?'':'Configure a conexão para entrar';
+}
+function showCfg(){
+  $('app').classList.add('hide');$('login').classList.remove('hide');
+  $('li-msg').textContent='Configure a conexão com o banco (uma vez por aparelho)';
+  $('li-cfg').textContent='⚙️ Configurar conexão';
+}
+$('li-cfg').onclick=async()=>{
+  const url=prompt('URL do projeto Supabase (Settings → API → Project URL):');
+  if(!url)return;
+  const anon=prompt('Chave anon public (Settings → API → anon public):');
+  if(!anon)return;
+  try{saveConn(url,anon);$('cfg-msg').className='msg ok';$('cfg-msg').textContent='Conexão salva!';await init()}catch(e){$('cfg-msg').className='msg err';$('cfg-msg').textContent=err(e)}
+};
+$('li-btn').onclick=login;
+$('li-pass').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+async function login(){
+  const email=$('li-email').value.trim(), pass=$('li-pass').value;
+  if(!email||!pass){$('li-msg').className='msg err';$('li-msg').textContent='Preencha usuário e senha';return}
+  $('li-btn').disabled=true;$('li-msg').textContent='';
+  try{
+    const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error)throw error;
+    await afterLogin();
+  }catch(e){$('li-msg').className='msg err';$('li-msg').textContent=err(e)}
+  $('li-btn').disabled=false;
+}
+async function afterLogin(){
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user){showLogin();return}
+  let {data:u,error:e1}=await sb.from('usuarios').select('*').eq('id',user.id).maybeSingle();
+  if(e1){toast('Erro ao carregar perfil: '+err(e1))}
+  if(!u){
+    // bootstrap: primeiro login vira gerência
+    const nome=user.email.split('@')[0].replace(/[._-]/g,' ').toUpperCase();
+    const {data:u2,error:e2}=await sb.rpc('auto_cadastro_gerencia',{p_nome:nome});
+    if(e2){$('li-msg').className='msg err';$('li-msg').textContent='Primeiro acesso: '+err(e2);showLogin();return}
+    u={id:user.id,nome,perfil:'gerencia',email:user.email};
+  }
+  ME=u;ME.email=user.email;
+  if(ME.perfil==='motorista'){
+    const {data:m}=await sb.from('motoristas').select('*').eq('usuario_id',user.id).maybeSingle();
+    ME.motorista=m;
+  }
+  buildNav();$('login').classList.add('hide');$('app').classList.remove('hide');
+  go('home');
+  loadNotif();
+}
+function logout(){sb.auth.signOut().then(()=>location.reload())}
+/* ============ navegação ============ */
+const MENUS={
+  gerencia:['home','veiculos','motoristas','jornadas','conferencia','abastecimentos','despesas','avisos','os','multas','documentos','usuarios','auditoria'],
+  motorista:['home','jornada','gastos','avisos','multas','documentos'],
+  conferente:['home','conferencia','despesas','avisos','multas'],
+  mecanico:['home','os']
+};
+const TITLES={home:'Início',veiculos:'Veículos',motoristas:'Motoristas',jornadas:'Jornadas',conferencia:'Conferência',abastecimentos:'Abastecimentos',despesas:'Despesas',avisos:'Avisos',os:'Ordens de serviço',multas:'Multas',documentos:'Documentos',usuarios:'Usuários',auditoria:'Auditoria',jornada:'Minha jornada',gastos:'Incluir gasto'};
+function buildNav(){
+  const items=MENUS[ME.perfil]||MENUS.gerencia;
+  NAV=items;
+  $('nav').innerHTML=`<div class="who">${esc(ME.nome)}<br><span style="color:var(--acc)">${esc(ME.perfil)}</span></div>`+
+    items.map(p=>`<button data-pg="${p}" class="${p===PAGE?'on':''}">${ICONS[p]||'•'} ${TITLES[p]||p}</button>`).join('')+
+    `<button id="nv-out">🚪 Sair</button>`;
+  $('nav').querySelectorAll('[data-pg]').forEach(b=>b.onclick=()=>{go(b.dataset.pg);closeNav()});
+  $('nv-out').onclick=logout;
+}
+const ICONS={home:'🏠',veiculos:'🚚',motoristas:'🧑‍✈️',jornadas:'🛣️',conferencia:'📋',abastecimentos:'⛽',despesas:'💰',avisos:'📣',os:'🔧',multas:'🚨',documentos:'📄',usuarios:'👥',auditoria:'🧾',jornada:'🛣️',gastos:'💰'};
+$('burger').onclick=()=>{$('nav').classList.add('open');$('scrim').classList.remove('hide')};
+$('scrim').onclick=closeNav;
+function closeNav(){$('nav').classList.remove('open');$('scrim').classList.add('hide')}
+$('bell').onclick=()=>go('notif');
+async function loadNotif(){
+  if(!ME)return;
+  try{
+    const {count,error}=await sb.from('notificacoes').select('*',{count:'exact',head:true}).eq('usuario_id',ME.id).eq('lida',false);
+    if(error)return;
+    const n=count||0;
+    $('bdg').textContent=n;$('bdg').classList.toggle('hide',n===0);
+  }catch(e){}
+}
+/* ============ roteador ============ */
+const PAGES={};
+function go(p){
+  PAGE=p;
+  $('pg-title').textContent=TITLES[p]||'';
+  $('nav').querySelectorAll('[data-pg]').forEach(b=>b.classList.toggle('on',b.dataset.pg===p));
+  const fn=PAGES[p]||PAGES.home;
+  $('main').innerHTML='';fn($('main'));
+  if(p!=='notif')loadNotif();
+}
+/* ============ helpers de dados ============ */
+async function sel(table,cols,order){let q=sb.from(table).select(cols);if(order)q=q.order(order,{ascending:false});const {data,error}=await q;if(error){toast(err(error));return null}return data}
+async function ins(table,row){const {data,error}=await sb.from(table).insert(row).select().single();if(error){toast(err(error));return null}return data}
+async function upd(table,id,row){const {data,error}=await sb.from(table).update(row).eq('id',id).select().single();if(error){toast(err(error));return null}return data}
+async function uploadFoto(file,path){
+  if(!file)return null;
+  if(file.size>8*1024*1024){toast('Foto muito grande (máx 8 MB)');return null}
+  const comp=await comprimir(file);
+  const {error}=await sb.storage.from('fotos').upload(path,comp,{upsert:true,contentType:comp.type});
+  if(error){toast('Erro ao enviar foto: '+err(error));return null}
+  return path;
+}
+async function uploadDoc(file,path){
+  const {error}=await sb.storage.from('documentos').upload(path,file,{upsert:true,contentType:file.type||'application/pdf'});
+  if(error){toast('Erro ao enviar documento: '+err(error));return null}
+  return path;
+}
+async function assinar(path,bucket){
+  const {data,error}=await sb.storage.from(bucket||'fotos').createSignedUrl(path,600);
+  if(error){return null}
+  return data.signedUrl;
+}
+async function fotoHtml(path,bucket){
+  if(!path)return'';
+  const url=await assinar(path,bucket);
+  return url?`<img class="photo" src="${url}" alt="comprovante">`:'';
+}
+async function comprimir(file){
+  if(!file.type.startsWith('image/'))return file;
+  try{
+    const bmp=await createImageBitmap(file);
+    const max=1200;let{width:w,height:h}=bmp;
+    if(w>max||h>max){const k=max/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    c.getContext('2d').drawImage(bmp,0,0,w,h);
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.7));
+    return blob&&blob.size<file.size?new File([blob],(file.name||'foto.jpg').replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'}):file;
+  }catch(e){return file}
+}
+/* ============ PÁGINAS — MOTORISTA ============ */
+PAGES.home=async el=>{
+  if(ME.perfil==='motorista')return PAGES.jornada(el);
+  if(ME.perfil==='mecanico')return PAGES.os(el);
+  if(ME.perfil==='conferente')return PAGES.conferencia(el);
+  return PAGES.dashboard(el);
+};
+PAGES.jornada=async el=>{
+  el.innerHTML=`<h1 class="pg">Minha jornada</h1><div id="j-wrap">${empty('Carregando…')}</div>`;
+  const w=$('j-wrap');
+  if(!ME.motorista){w.innerHTML=`<div class="sec">Seu usuário ainda não está vinculado a um cadastro de motorista. Peça à gerência.</div>`;return}
+  const {data:aberta}=await sb.from('jornadas').select('*, veiculos(placa,modelo)').eq('motorista_id',ME.motorista.id).eq('status','aberta').maybeSingle();
+  const {data:ultimas}=await sb.from('jornadas').select('*, veiculos(placa)').eq('motorista_id',ME.motorista.id).neq('status','aberta').order('inicio',{ascending:false}).limit(5);
+  if(!aberta){
+    const {data:veics}=await sb.from('motorista_veiculo').select('veiculo_id, veiculos(id,placa,modelo)').eq('motorista_id',ME.motorista.id).eq('ativo',true);
+    if(!veics||!veics.length){w.innerHTML=`<div class="sec">Nenhum veículo vinculado a você. Peça à gerência.</div>`;return}
+    w.innerHTML=`<div class="sec"><h3>Iniciar jornada</h3>
+      <label>Veículo</label><select id="j-veic">${veics.map(v=>`<option value="${v.veiculo_id}">${esc(v.veiculos.placa)} — ${esc(v.veiculos.modelo||'')}</option>`).join('')}</select>
+      <label>Quilometragem inicial</label><input id="j-km" type="number" inputmode="numeric" placeholder="ex.: 84500">
+      <label>Roteiro (1–10)</label><select id="j-rot">${Array.from({length:10},(_,i)=>`<option value="${i+1}">Roteiro ${i+1}</option>`).join('')}</select>
+      <button class="btn" id="j-iniciar">▶ Iniciar jornada</button><div class="msg" id="j-msg"></div></div>
+      ${ultimas&&ultimas.length?`<div class="sec"><h3>Últimas jornadas</h3><div class="tblwrap"><table><tr><th>Saída</th><th>Veículo</th><th>Roteiro</th><th>Km</th><th>Status</th></tr>${ultimas.map(j=>`<tr><td>${fmtDT(j.inicio)}</td><td>${esc(j.veiculos?.placa)}</td><td>${j.roteiro}</td><td>${km(j.km_inicial)}${j.km_final!=null?' → '+km(j.km_final):''}</td><td>${tag(j.status)}</td></tr>`).join('')}</table></div></div>`:''}`;
+    $('j-iniciar').onclick=async()=>{
+      const v=$('j-veic').value,kmv=parseFloat($('j-km').value);
+      if(!kmv&&kmv!==0){$('j-msg').className='msg err';$('j-msg').textContent='Informe a km inicial';return}
+      const r=await ins('jornadas',{motorista_id:ME.motorista.id,veiculo_id:v,roteiro:parseInt($('j-rot').value),km_inicial:kmv});
+      if(r){toast('Jornada iniciada! CRLV-e liberado em Multas e documentos');go('jornada')}
+    };
+  }else{
+    w.innerHTML=`<div class="sec"><h3>Jornada aberta — ${esc(aberta.veiculos?.placa||'')} · Roteiro ${aberta.roteiro}</h3>
+      <p class="hint">Início: ${fmtDT(aberta.inicio)} · Km inicial: ${km(aberta.km_inicial)}</p>
+      <label>Quilometragem final</label><input id="j-kmf" type="number" inputmode="numeric" placeholder="km na chegada">
+      <label>Ocorrências (opcional)</label><textarea id="j-oc" placeholder="algo aconteceu no trajeto?"></textarea>
+      <button class="btn" id="j-fechar">🏁 Finalizar jornada</button><div class="msg" id="j-msg2"></div></div>`;
+    $('j-fechar').onclick=async()=>{
+      const kmf=parseFloat($('j-kmf').value);
+      if(!kmf&&kmf!==0){$('j-msg2').className='msg err';$('j-msg2').textContent='Informe a km final';return}
+      if(kmf<aberta.km_inicial){$('j-msg2').className='msg err';$('j-msg2').textContent='Km final não pode ser menor que a inicial ('+km(aberta.km_inicial)+')';return}
+      const r=await upd('jornadas',aberta.id,{km_final:kmf,fim:new Date().toISOString(),ocorrencias:$('j-oc').value||null,status:'conferencia'});
+      if(r){toast('Jornada enviada para conferência');go('jornada')}
+    };
+  }
+};
+PAGES.gastos=async el=>{
+  el.innerHTML=`<h1 class="pg">Incluir gasto</h1>
+  <div class="sec"><h3>Novo lançamento</h3>
+  <label>Tipo</label><select id="g-tipo"><option value="abastecimento">⛽ Abastecimento</option><option value="despesa">💰 Outro gasto</option></select>
+  <div id="g-form"></div></div>`;
+  const render=async()=>{
+    const t=$('g-tipo').value, f=$('g-form');
+    const {data:veics}=await sb.from('motorista_veiculo').select('veiculo_id, veiculos(id,placa,modelo)').eq('motorista_id',ME.motorista.id).eq('ativo',true);
+    const vopts=(veics||[]).map(v=>`<option value="${v.veiculo_id}">${esc(v.veiculos.placa)}</option>`).join('');
+    if(t==='abastecimento'){
+      f.innerHTML=`<label>Veículo</label><select id="a-veic">${vopts}</select>
+      <label>Posto</label><input id="a-posto" placeholder="nome do posto">
+      <label>Quilometragem</label><input id="a-km" type="number" inputmode="numeric">
+      <label>Combustível</label><select id="a-comb">${opt([['S10','Diesel S10'],['S500','Diesel S500'],['Gasolina','Gasolina'],['Etanol','Etanol'],['ARLA','ARLA-32']],null)}</select>
+      <label>Litros</label><input id="a-litros" type="number" step="0.01" inputmode="decimal">
+      <label>Preço por litro (R$)</label><input id="a-preco" type="number" step="0.001" inputmode="decimal">
+      <label>Valor total (R$)</label><input id="a-total" type="number" step="0.01" inputmode="decimal">
+      <label>Abastecimento parcial?</label><select id="a-parcial"><option value="false">Tanque cheio / normal</option><option value="true">Parcial (não conta na média)</option></select>
+      <label>Foto do comprovante *</label><input id="a-foto" type="file" accept="image/*" capture="environment">
+      <button class="btn" id="a-btn">Lançar abastecimento</button><div class="msg" id="a-msg"></div>`;
+      $('a-btn').onclick=async()=>{
+        const litros=parseFloat($('a-litros').value),total=parseFloat($('a-total').value),kmv=parseFloat($('a-km').value);
+        const file=$('a-foto').files[0];
+        if(!litros||!total||!kmv){$('a-msg').className='msg err';$('a-msg').textContent='Preencha km, litros e valor total';return}
+        if(!file){$('a-msg').className='msg err';$('a-msg').textContent='A foto do comprovante é obrigatória';return}
+        const path=`${ME.id}/${Date.now()}.jpg`;
+        const p=await uploadFoto(file,path);
+        if(!p)return;
+        const r=await ins('abastecimentos',{jornada_id:(await jornadaAbertaId())||null,motorista_id:ME.motorista.id,veiculo_id:$('a-veic').value,posto:$('a-posto').value||null,km:kmv,combustivel:$('a-comb').value,litros,preco_litro:parseFloat($('a-preco').value)||null,valor_total:total,parcial:$('a-parcial').value==='true',foto_path:p});
+        if(r){toast('Abastecimento lançado!');go('gastos')}
+      };
+    }else{
+      f.innerHTML=`<label>Veículo</label><select id="d-veic"><option value="">—</option>${vopts}</select>
+      <label>Categoria</label><select id="d-cat">${opt([['Pneu/borracharia','Pneu/borracharia'],['Manutenção emergencial','Manutenção emergencial'],['Peças','Peças'],['Pedágio','Pedágio'],['Estacionamento','Estacionamento'],['Alimentação','Alimentação'],['Outros','Outros']],null)}</select>
+      <label>Descrição</label><input id="d-desc" placeholder="o que foi pago">
+      <label>Valor (R$)</label><input id="d-valor" type="number" step="0.01" inputmode="decimal">
+      <label>Quilometragem (opcional)</label><input id="d-km" type="number" inputmode="numeric">
+      <label>Foto do recibo *</label><input id="d-foto" type="file" accept="image/*" capture="environment">
+      <label>Observações</label><textarea id="d-obs"></textarea>
+      <button class="btn" id="d-btn">Lançar despesa</button><div class="msg" id="d-msg"></div>`;
+      $('d-btn').onclick=async()=>{
+        const valor=parseFloat($('d-valor').value),file=$('d-foto').files[0];
+        if(!valor||!file){$('d-msg').className='msg err';$('d-msg').textContent='Preencha o valor e anexe a foto do recibo';return}
+        const path=`${ME.id}/${Date.now()}.jpg`;
+        const p=await uploadFoto(file,path);if(!p)return;
+        const r=await ins('despesas',{jornada_id:(await jornadaAbertaId())||null,motorista_id:ME.motorista.id,veiculo_id:$('d-veic').value||null,categoria:$('d-cat').value,descricao:$('d-desc').value||null,km:parseFloat($('d-km').value)||null,valor,foto_path:p,obs:$('d-obs').value||null});
+        if(r){toast('Despesa lançada! Aguardando aprovação');go('gastos')}
+      };
+    }
+  };
+  $('g-tipo').onchange=render;render();
+};
+async function jornadaAbertaId(){if(!ME.motorista)return null;const {data}=await sb.from('jornadas').select('id').eq('motorista_id',ME.motorista.id).eq('status','aberta').maybeSingle();return data?data.id:null}
+PAGES.avisos=async el=>{
+  if(ME.perfil==='motorista')return pagAvisosMotorista(el);
+  return pagAvisosGestao(el);
+};
+async function pagAvisosMotorista(el){
+  el.innerHTML=`<h1 class="pg">Avisar gerência</h1>
+  <div class="sec"><h3>Novo aviso</h3>
+  <label>Categoria</label><select id="av-cat">${opt([['Pneu','Pneu'],['Freio','Freio'],['Ruído','Ruído'],['Luz no painel','Luz no painel'],['Avaria','Avaria'],['Manutenção','Manutenção'],['Outros','Outros']],null)}</select>
+  <label>Veículo</label><select id="av-veic"></select>
+  <label>O que está acontecendo?</label><textarea id="av-txt" placeholder="ex.: pneu dianteiro careca, barulho no motor..."></textarea>
+  <label>Fotos (até 3)</label><input id="av-f1" type="file" accept="image/*" capture="environment">
+  <input id="av-f2" type="file" accept="image/*" style="margin-top:6px">
+  <input id="av-f3" type="file" accept="image/*" style="margin-top:6px">
+  <button class="btn" id="av-btn">Enviar aviso</button><div class="msg" id="av-msg"></div></div>
+  <div class="sec"><h3>Meus avisos</h3><div id="av-list">${empty('Carregando…')}</div></div>`;
+  const {data:veics}=await sb.from('motorista_veiculo').select('veiculo_id, veiculos(id,placa)').eq('motorista_id',ME.motorista.id).eq('ativo',true);
+  $('av-veic').innerHTML=(veics||[]).map(v=>`<option value="${v.veiculo_id}">${esc(v.veiculos.placa)}</option>`).join('');
+  $('av-btn').onclick=async()=>{
+    const txt=$('av-txt').value.trim();
+    if(!txt){$('av-msg').className='msg err';$('av-msg').textContent='Escreva o aviso';return}
+    $('av-msg').textContent='Enviando…';
+    const fotos=[];
+    for(const idf of ['av-f1','av-f2','av-f3']){
+      const file=$(idf).files[0];if(!file)continue;
+      const p=await uploadFoto(file,`${ME.id}/${Date.now()}-${idf}.jpg`);
+      if(p)fotos.push(p);
+    }
+    const r=await ins('avisos',{motorista_id:ME.motorista.id,veiculo_id:$('av-veic').value,categoria:$('av-cat').value,texto:txt,fotos});
+    if(r){toast('Aviso enviado à gerência!');go('avisos')}
+  };
+  const {data:meus}=await sb.from('avisos').select('*, veiculos(placa)').eq('motorista_id',ME.motorista.id).order('criado_em',{ascending:false}).limit(20);
+  $('av-list').innerHTML=meus&&meus.length?meus.map(a=>`<div style="padding:9px 0;border-bottom:1px solid #242424"><b>${esc(a.categoria||'Aviso')}</b> — ${esc(a.veiculos?.placa||'')} ${tag(a.status)}<div style="font-size:13px;color:var(--mut);margin-top:3px">${esc(a.texto)}</div><div style="font-size:11px;color:#666;margin-top:2px">${fmtDT(a.criado_em)}</div></div>`).join(''):empty('Nenhum aviso enviado');
+}
+async function pagAvisosGestao(el){
+  el.innerHTML=`<h1 class="pg">Avisos dos motoristas</h1><div id="av-g">${empty('Carregando…')}</div>`;
+  const {data:lista}=await sb.from('avisos').select('*, veiculos(placa,modelo), motoristas(nome)').order('criado_em',{ascending:false}).limit(100);
+  const g=$('av-g');
+  if(!lista||!lista.length){g.innerHTML=empty('Nenhum aviso');return}
+  g.innerHTML=`<div class="tblwrap"><table><tr><th>Quando</th><th>Motorista</th><th>Veículo</th><th>Categoria</th><th>Aviso</th><th>Status</th><th></th></tr>
+  ${lista.map(a=>`<tr><td>${fmtDT(a.criado_em)}</td><td>${esc(a.motoristas?.nome)}</td><td>${esc(a.veiculos?.placa)}</td><td>${esc(a.categoria||'—')}</td><td>${esc(a.texto)}</td><td>${tag(a.status)}</td>
+  <td><button class="btn mini" data-av="${a.id}" data-st="${a.status==='recebido'?'em_analise':a.status==='em_analise'?'encaminhado':a.status==='encaminhado'?'resolvido':'arquivado'}">${a.status==='recebido'?'▶ Em análise':a.status==='em_analise'?'🔧 Encaminhar p/ mecânico':a.status==='encaminhado'?'✓ Resolver':'🗄 Arquivar'}</button></td></tr>`).join('')}</table></div>`;
+  g.querySelectorAll('[data-av]').forEach(b=>b.onclick=async()=>{
+    const r=await upd('avisos',b.dataset.av,{status:b.dataset.st});
+    if(r){toast('Status atualizado');go('avisos')}
+  });
+}
+/* ============ PÁGINAS — CONFERENTE/GERÊNCIA ============ */
+PAGES.conferencia=async el=>{
+  el.innerHTML=`<h1 class="pg">Conferência de jornadas</h1><div id="cf">${empty('Carregando…')}</div>`;
+  const {data:lista}=await sb.from('jornadas').select('*, veiculos(placa,modelo), motoristas(nome)').eq('status','conferencia').order('fim',{ascending:false}).limit(100);
+  const c=$('cf');
+  if(!lista||!lista.length){c.innerHTML=empty('Nenhuma jornada aguardando conferência 🎉');return}
+  const ITENS=['Motorista retornou?','Roteiro informado corretamente?','Todas as notas/canhotos entregues?','Comprovantes anexados?','Divergência ou ocorrência?'];
+  c.innerHTML=`<div class="hint" style="margin-bottom:10px">Marque cada item. A jornada só fecha com todos conferidos.</div>`+lista.map(j=>`
+  <div class="sec" data-j="${j.id}">
+    <h3>${esc(j.motoristas?.nome)} · ${esc(j.veiculos?.placa)} · Roteiro ${j.roteiro}</h3>
+    <p class="hint">Saída ${fmtDT(j.inicio)} · Chegada ${fmtDT(j.fim)} · ${km(j.km_inicial)} → ${km(j.km_final)}</p>
+    ${j.ocorrencias?`<p style="font-size:13px;margin-top:6px">⚠️ ${esc(j.ocorrencias)}</p>`:''}
+    ${ITENS.map((it,i)=>`<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" class="cf-item" data-j="${j.id}" data-i="${i}"> ${it}</label>`).join('')}
+    <button class="btn" data-close="${j.id}">✓ Fechar jornada</button><div class="msg" id="cfm-${j.id}"></div>
+  </div>`).join('');
+  c.querySelectorAll('[data-close]').forEach(b=>b.onclick=async()=>{
+    const jid=b.dataset.close;
+    const boxes=[...c.querySelectorAll(`.cf-item[data-j="${jid}"]`)];
+    const marcados=boxes.filter(x=>x.checked).length;
+    if(marcados<boxes.length){$('cfm-'+jid).className='msg err';$('cfm-'+jid).textContent='Faltam itens do checklist ('+marcados+'/'+boxes.length+')';return}
+    // grava checklist e fecha
+    for(let i=0;i<boxes.length;i++){
+      await sb.from('jornada_conferencia').upsert({jornada_id:jid,item:ITENS[i],ok:boxes[i].checked,conferido_por:ME.id,conferido_em:new Date().toISOString()});
+    }
+    const r=await upd('jornadas',jid,{status:'fechada',conferida_por:ME.id,conferida_em:new Date().toISOString()});
+    if(r){toast('Jornada fechada');go('conferencia')}
+  });
+};
+PAGES.abastecimentos=async el=>{
+  el.innerHTML=`<h1 class="pg">Abastecimentos</h1><div id="ab-f" class="sec"><h3>Filtros</h3><div class="row"><div><label>De</label><input id="f-de" type="date" value=""></div><div><label>Até</label><input id="f-ate" type="date" value=""></div></div><button class="btn mini" id="f-btn">Filtrar</button></div><div id="ab-l">${empty('Carregando…')}</div>`;
+  const carregar=async()=>{
+    let q=sb.from('abastecimentos').select('*, veiculos(placa), motoristas(nome)').order('data',{ascending:false}).limit(300);
+    const de=$('f-de').value,ate=$('f-ate').value;
+    if(de)q=q.gte('data',de);if(ate)q=q.lte('data',ate+'T23:59:59');
+    const {data,error}=await q;
+    const l=$('ab-l');
+    if(error){l.innerHTML=empty(err(error));return}
+    if(!data||!data.length){l.innerHTML=empty('Nenhum abastecimento no período');return}
+    const tot=data.reduce((s,a)=>s+Number(a.valor_total),0);
+    const litros=data.reduce((s,a)=>s+Number(a.litros||0),0);
+    l.innerHTML=`<div class="kpis"><div class="kpi"><div class="v">${fmtBRL(tot)}</div><div class="l">Total no período</div></div><div class="kpi"><div class="v">${litros.toLocaleString('pt-BR',{maximumFractionDigits:0})} L</div><div class="l">Litros</div></div><div class="kpi"><div class="v">${data.length}</div><div class="l">Lançamentos</div></div></div>
+    <div class="tblwrap"><table><tr><th>Data</th><th>Veículo</th><th>Motorista</th><th>Posto</th><th>Km</th><th>Litros</th><th>R$/L</th><th>Total</th><th>Foto</th></tr>
+    ${data.map(a=>`<tr><td>${fmtDT(a.data)}</td><td>${esc(a.veiculos?.placa)}</td><td>${esc(a.motoristas?.nome)}</td><td>${esc(a.posto||'—')}</td><td>${km(a.km)}</td><td>${a.litros??'—'}</td><td>${a.preco_litro??'—'}</td><td>${fmtBRL(a.valor_total)}</td><td><button class="btn mini" data-foto="${a.foto_path}">👁</button></td></tr>`).join('')}</table></div>`;
+    l.querySelectorAll('[data-foto]').forEach(b=>b.onclick=async()=>{
+      const url=await assinar(b.dataset.foto);
+      if(url)window.open(url,'_blank');
+    });
+  };
+  $('f-btn').onclick=carregar;carregar();
+};
+PAGES.despesas=async el=>{
+  el.innerHTML=`<h1 class="pg">Despesas</h1><div id="dp">${empty('Carregando…')}</div>`;
+  const {data:lista}=await sb.from('despesas').select('*, veiculos(placa), motoristas(nome)').order('data',{ascending:false}).limit(200);
+  const d=$('dp');
+  if(!lista||!lista.length){d.innerHTML=empty('Nenhuma despesa');return}
+  d.innerHTML=`<div class="tblwrap"><table><tr><th>Data</th><th>Motorista</th><th>Veículo</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Status</th><th></th></tr>
+  ${lista.map(x=>`<tr><td>${fmtDT(x.data)}</td><td>${esc(x.motoristas?.nome)}</td><td>${esc(x.veiculos?.placa||'—')}</td><td>${esc(x.categoria)}</td><td>${esc(x.descricao||'—')}</td><td>${fmtBRL(x.valor)}</td><td>${tag(x.status)}</td>
+  <td>${(x.status==='aguardando'&&(ME.perfil==='gerencia'||ME.perfil==='conferente'))?`<button class="btn mini" data-ok="${x.id}">✓</button> <button class="btn mini" data-no="${x.id}">✗</button>`:''}</td></tr>`).join('')}</table></div>`;
+  d.querySelectorAll('[data-ok]').forEach(b=>b.onclick=async()=>{if(await upd('despesas',b.dataset.ok,{status:'aprovada',aprovada_por:ME.id,aprovada_em:new Date().toISOString()}))go('despesas')});
+  d.querySelectorAll('[data-no]').forEach(b=>b.onclick=async()=>{
+    const motivo=prompt('Motivo da reprovação:');
+    if(motivo===null)return;
+    if(await upd('despesas',b.dataset.no,{status:'reprovada',motivo_reprovacao:motivo,aprovada_por:ME.id,aprovada_em:new Date().toISOString()}))go('despesas');
+  });
+};
+PAGES.multas=async el=>{
+  const ehGestao=ME.perfil==='gerencia'||ME.perfil==='conferente';
+  el.innerHTML=`<h1 class="pg">Multas</h1>${ehGestao?`<div class="sec"><h3>Cadastrar multa</h3>
+    <div class="row"><div><label>Veículo</label><select id="m-veic"></select></div><div><label>Motorista</label><select id="m-mot"><option value="">— não identificado —</option></select></div></div>
+    <div class="row"><div><label>Órgão/autuação</label><input id="m-orgao"></div><div><label>Valor (R$)</label><input id="m-valor" type="number" step="0.01"></div></div>
+    <div class="row"><div><label>Data da infração</label><input id="m-data" type="date"></div><div><label>Prazo</label><input id="m-prazo" type="date"></div></div>
+    <label>Notificação (foto/PDF)</label><input id="m-arq" type="file" accept="image/*,application/pdf">
+    <label>Observações</label><input id="m-obs">
+    <button class="btn" id="m-btn">Cadastrar multa</button><div class="msg" id="m-msg"></div></div>`:''}
+  <div id="m-list">${empty('Carregando…')}</div>`;
+  if(ehGestao){
+    const {data:veics}=await sel('veiculos','id,placa,ativo','placa');
+    $('m-veic').innerHTML=(veics||[]).filter(v=>v.ativo).map(v=>`<option value="${v.id}">${esc(v.placa)}</option>`).join('');
+    const {data:mots}=await sel('motoristas','id,nome,ativo','nome');
+    $('m-mot').innerHTML+= (mots||[]).filter(m=>m.ativo).map(m=>`<option value="${m.id}">${esc(m.nome)}</option>`).join('');
+    $('m-btn').onclick=async()=>{
+      const file=$('m-arq').files[0];
+      const vid=$('m-veic').value;
+      if(!vid){$('m-msg').className='msg err';$('m-msg').textContent='Escolha o veículo';return}
+      let path=null;
+      if(file){
+        const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+        path=`${vid}/${Date.now()}.${ext}`;
+        const ok=await uploadDoc(file,path);if(!ok)return;
+      }
+      const r=await ins('multas',{veiculo_id:vid,motorista_id:$('m-mot').value||null,orgao:$('m-orgao').value||null,data_infracao:$('m-data').value||null,prazo:$('m-prazo').value||null,valor:parseFloat($('m-valor').value)||null,notificacao_path:path,obs:$('m-obs').value||null,cadastrada_por:ME.id});
+      if(r){toast('Multa cadastrada');go('multas')}
+    };
+  }
+  const {data:lista}=await sb.from('multas').select('*, veiculos(placa), motoristas(nome)').order('criado_em',{ascending:false}).limit(200);
+  const l=$('m-list');
+  if(!lista||!lista.length){l.innerHTML=empty('Nenhuma multa cadastrada');return}
+  l.innerHTML=`<div class="tblwrap"><table><tr><th>Veículo</th><th>Motorista</th><th>Órgão</th><th>Infração</th><th>Prazo</th><th>Valor</th><th>Status</th><th></th></tr>
+  ${lista.map(m=>`<tr><td>${esc(m.veiculos?.placa)}</td><td>${esc(m.motoristas?.nome||'—')}</td><td>${esc(m.orgao||'—')}</td><td>${fmtD(m.data_infracao)}</td><td>${fmtD(m.prazo)}</td><td>${fmtBRL(m.valor)}</td><td>${tag(m.status)}</td>
+  <td>${m.status==='aguardando_ciencia'&&ME.perfil==='motorista'?`<button class="btn mini" data-cie="${m.id}">Confirmar ciência</button>`:''}</td></tr>`).join('')}</table></div>`;
+  l.querySelectorAll('[data-cie]').forEach(b=>b.onclick=async()=>{
+    if(await upd('multas',b.dataset.cie,{status:'ciente',ciencia_em:new Date().toISOString()}))go('multas');
+  });
+};
+PAGES.documentos=async el=>{
+  const ehGestao=ME.perfil==='gerencia'||ME.perfil==='conferente';
+  el.innerHTML=`<h1 class="pg">Documentos</h1>
+  ${ehGestao?`<div class="sec"><h3>Enviar CRLV-e</h3>
+    <label>Veículo</label><select id="dc-veic"></select>
+    <label>Arquivo PDF</label><input id="dc-arq" type="file" accept="application/pdf,image/*">
+    <label>Vencimento (opcional)</label><input id="dc-venc" type="date">
+    <button class="btn" id="dc-btn">Enviar documento</button><div class="msg" id="dc-msg"></div></div>`:''}
+  <div id="dc-list">${empty('Carregando…')}</div>`;
+  if(ehGestao){
+    const {data:veics}=await sel('veiculos','id,placa,ativo','placa');
+    $('dc-veic').innerHTML=(veics||[]).filter(v=>v.ativo).map(v=>`<option value="${v.id}">${esc(v.placa)}</option>`).join('');
+    $('dc-btn').onclick=async()=>{
+      const file=$('dc-arq').files[0],vid=$('dc-veic').value;
+      if(!file||!vid){$('dc-msg').className='msg err';$('dc-msg').textContent='Escolha o veículo e o arquivo';return}
+      const ext=(file.name.split('.').pop()||'pdf').toLowerCase();
+      const path=`${vid}/${Date.now()}.${ext}`;
+      const ok=await uploadDoc(file,path);if(!ok)return;
+      const r=await ins('veiculos_documentos',{veiculo_id:vid,tipo:'CRLV-e',arquivo_path:path,vencimento:$('dc-venc').value||null,enviado_por:ME.id});
+      if(r){toast('Documento enviado');go('documentos')}
+    };
+  }
+  const {data:lista}=await sb.from('veiculos_documentos').select('*, veiculos(placa)').order('criado_em',{ascending:false});
+  const l=$('dc-list');
+  if(!lista||!lista.length){l.innerHTML=empty('Nenhum documento enviado');return}
+  l.innerHTML=`<div class="tblwrap"><table><tr><th>Veículo</th><th>Tipo</th><th>Vencimento</th><th>Enviado</th><th></th></tr>
+  ${lista.map(d=>`<tr><td>${esc(d.veiculos?.placa)}</td><td>${esc(d.tipo)}</td><td>${fmtD(d.vencimento)}</td><td>${fmtDT(d.criado_em)}</td><td><button class="btn mini" data-dc="${d.arquivo_path}">Abrir</button></td></tr>`).join('')}</table></div>`;
+  l.querySelectorAll('[data-dc]').forEach(b=>b.onclick=async()=>{
+    const url=await assinar(b.dataset.dc,'documentos');
+    if(url)window.open(url,'_blank');
+  });
+};
+/* ============ PÁGINAS — GERÊNCIA ============ */
+PAGES.dashboard=async el=>{
+  el.innerHTML=`<h1 class="pg">Dashboard</h1><div id="db">${empty('Carregando…')}</div>`;
+  const [js,vs,ms,ds,avs,osL]=await Promise.all([
+    sb.from('jornadas').select('status').neq('status','fechada'),
+    sb.from('veiculos').select('id,placa,ativo'),
+    sb.from('multas').select('id').eq('status','aguardando_ciencia'),
+    sb.from('despesas').select('valor').eq('status','aguardando'),
+    sb.from('avisos').select('id').in('status',['recebido','em_analise']),
+    sb.from('ordens_servico').select('id').neq('status','concluida')
+  ]);
+  const j=js.data||[],v=vs.data||[];
+  const abertas=j.filter(x=>x.status==='aberta').length;
+  const conf=j.filter(x=>x.status==='conferencia').length;
+  const ativos=v.filter(x=>x.ativo).length;
+  const totDesp=(ds.data||[]).reduce((s,x)=>s+Number(x.valor),0);
+  $('db').innerHTML=`<div class="kpis">
+    <div class="kpi"><div class="v">${abertas}</div><div class="l">Jornadas abertas</div></div>
+    <div class="kpi"><div class="v">${conf}</div><div class="l">Aguardando conferência</div></div>
+    <div class="kpi"><div class="v">${ativos}</div><div class="l">Veículos ativos</div></div>
+    <div class="kpi"><div class="v">${(ms.data||[]).length}</div><div class="l">Multas sem ciência</div></div>
+    <div class="kpi"><div class="v">${fmtBRL(totDesp)}</div><div class="l">Reembolsos pendentes</div></div>
+    <div class="kpi"><div class="v">${(avs.data||[]).length}</div><div class="l">Avisos em aberto</div></div>
+    <div class="kpi"><div class="v">${(osL.data||[]).length}</div><div class="l">OS abertas</div></div>
+  </div>
+  <div class="sec"><h3>Frota</h3><p class="hint">${ativos} ativos · ${v.length-ativos} inativados · ${j.filter(x=>x.status==='conferencia').length} jornadas em conferência</p></div>`;
+};
+PAGES.veiculos=async el=>{
+  el.innerHTML=`<h1 class="pg">Veículos</h1>
+  <div class="sec"><h3>Novo veículo</h3>
+  <div class="row"><div><label>Placa</label><input id="v-placa" placeholder="ABC-1D23" style="text-transform:uppercase"></div><div><label>RENAVAM</label><input id="v-renavam"></div></div>
+  <div class="row"><div><label>Marca</label><input id="v-marca"></div><div><label>Modelo</label><input id="v-modelo"></div></div>
+  <div class="row"><div><label>Ano</label><input id="v-ano" type="number"></div><div><label>Cor</label><input id="v-cor"></div></div>
+  <div class="row"><div><label>Intervalo troca de óleo (km)</label><input id="v-oleo" type="number" placeholder="ex.: 10000"></div><div><label>Última troca (km)</label><input id="v-oleo-km" type="number"></div></div>
+  <button class="btn" id="v-btn">Cadastrar veículo</button><div class="msg" id="v-msg"></div></div>
+  <div id="v-list">${empty('Carregando…')}</div>`;
+  $('v-btn').onclick=async()=>{
+    const placa=$('v-placa').value.trim().toUpperCase();
+    if(!placa){$('v-msg').className='msg err';$('v-msg').textContent='Informe a placa';return}
+    const r=await ins('veiculos',{placa,renavam:$('v-renavam').value||null,marca:$('v-marca').value||null,modelo:$('v-modelo').value||null,ano:parseInt($('v-ano').value)||null,cor:$('v-cor').value||null,intervalo_oleo_km:parseInt($('v-oleo').value)||null,ultima_troca_oleo_km:parseInt($('v-oleo-km').value)||null});
+    if(r){toast('Veículo cadastrado');go('veiculos')}
+  };
+  const {data:lista}=await sel('veiculos','*','placa');
+  const l=$('v-list');
+  if(!lista||!lista.length){l.innerHTML=empty('Nenhum veículo');return}
+  l.innerHTML=`<div class="tblwrap"><table><tr><th>Placa</th><th>Marca/Modelo</th><th>Ano</th><th>RENAVAM</th><th>Óleo (km)</th><th>Status</th><th></th></tr>
+  ${lista.map(v=>`<tr><td><b>${esc(v.placa)}</b></td><td>${esc(v.marca||'')} ${esc(v.modelo||'')}</td><td>${v.ano||'—'}</td><td>${esc(v.renavam||'—')}</td><td>${v.intervalo_oleo_km?km(v.intervalo_oleo_km):'—'}</td><td>${v.ativo?'<span class="tag fechada">ativo</span>':'<span class="tag arquivado">inativo</span>'}</td>
+  <td>${ME.perfil==='gerencia'?`<button class="btn mini" data-tg="${v.id}" data-a="${v.ativo?0:1}">${v.ativo?'Inativar':'Reativar'}</button>`:''}</td></tr>`).join('')}</table></div>`;
+  l.querySelectorAll('[data-tg]').forEach(b=>b.onclick=async()=>{
+    if(await upd('veiculos',b.dataset.tg,{ativo:b.dataset.a==='1'}))go('veiculos');
+  });
+};
+PAGES.motoristas=async el=>{
+  el.innerHTML=`<h1 class="pg">Motoristas</h1>
+  <div class="sec"><h3>Novo motorista</h3>
+  <div class="row"><div><label>Nome completo *</label><input id="mo-nome"></div><div><label>CPF</label><input id="mo-cpf"></div></div>
+  <div class="row"><div><label>CNH</label><input id="mo-cnh"></div><div><label>Categoria</label><input id="mo-cat" placeholder="D / E"></div></div>
+  <div class="row"><div><label>Validade CNH</label><input id="mo-val" type="date"></div><div><label>Contato</label><input id="mo-cont"></div></div>
+  <button class="btn" id="mo-btn">Cadastrar motorista</button><div class="msg" id="mo-msg"></div></div>
+  <div id="mo-list">${empty('Carregando…')}</div>`;
+  $('mo-btn').onclick=async()=>{
+    const nome=$('mo-nome').value.trim();
+    if(!nome){$('mo-msg').className='msg err';$('mo-msg').textContent='Informe o nome';return}
+    const cpf=$('mo-cpf').value.trim(),cnh=$('mo-cnh').value.trim(),val=$('mo-val').value;
+    const situacao=(cpf&&cnh&&val)?'completo':'incompleto';
+    const r=await ins('motoristas',{nome,cpf:cpf||null,cnh:cnh||null,cnh_categoria:$('mo-cat').value||null,cnh_validade:val||null,contato:$('mo-cont').value||null,situacao});
+    if(r){toast('Motorista cadastrado'+(situacao==='incompleto'?' (com pendências)':''));go('motoristas')}
+  };
+  const {data:lista}=await sel('motoristas','*','nome');
+  const l=$('mo-list');
+  if(!lista||!lista.length){l.innerHTML=empty('Nenhum motorista');return}
+  const hojeStr=hoje();
+  l.innerHTML=`<div class="tblwrap"><table><tr><th>Nome</th><th>CPF</th><th>CNH</th><th>Validade</th><th>Situação</th><th></th></tr>
+  ${lista.map(m=>{const venc=m.cnh_validade&&m.cnh_validade<hojeStr;return `<tr><td><b>${esc(m.nome)}</b></td><td>${esc(m.cpf||'—')}</td><td>${esc(m.cnh||'—')}</td><td style="${venc?'color:var(--bad)':''}">${fmtD(m.cnh_validade)}${venc?' ⚠️':''}</td><td>${m.situacao==='completo'?'<span class="tag aprovada">completo</span>':'<span class="tag aguardando">incompleto</span>'}</td>
+  <td>${ME.perfil==='gerencia'?`<button class="btn mini" data-tg="${m.id}" data-a="${m.ativo?0:1}">${m.ativo?'Inativar':'Reativar'}</button>`:''}</td></tr>`}).join('')}</table></div>`;
+  l.querySelectorAll('[data-tg]').forEach(b=>b.onclick=async()=>{
+    if(await upd('motoristas',b.dataset.tg,{ativo:b.dataset.a==='1'}))go('motoristas');
+  });
+};
+PAGES.jornadas=async el=>{
+  el.innerHTML=`<h1 class="pg">Jornadas</h1><div id="jn">${empty('Carregando…')}</div>`;
+  const {data:lista}=await sb.from('jornadas').select('*, veiculos(placa), motoristas(nome)').order('inicio',{ascending:false}).limit(200);
+  const l=$('jn');
+  if(!lista||!lista.length){l.innerHTML=empty('Nenhuma jornada');return}
+  l.innerHTML=`<div class="tblwrap"><table><tr><th>Saída</th><th>Motorista</th><th>Veículo</th><th>Roteiro</th><th>Km</th><th>Ocorrências</th><th>Status</th></tr>
+  ${lista.map(j=>`<tr><td>${fmtDT(j.inicio)}</td><td>${esc(j.motoristas?.nome)}</td><td>${esc(j.veiculos?.placa)}</td><td>${j.roteiro}</td><td>${km(j.km_inicial)}${j.km_final!=null?' → '+km(j.km_final):''}</td><td>${esc(j.ocorrencias||'—')}</td><td>${tag(j.status)}</td></tr>`).join('')}</table></div>`;
+};
+PAGES.os=async el=>{
+  el.innerHTML=`<h1 class="pg">Ordens de serviço</h1>
+  ${ME.perfil==='mecanico'?'':`<div class="sec"><h3>Abrir OS</h3>
+    <label>Veículo</label><select id="o-veic"></select>
+    <label>Descrição do problema/serviço</label><textarea id="o-desc"></textarea>
+    <label>Vincular aviso (opcional)</label><select id="o-aviso"><option value="">—</option></select>
+    <button class="btn" id="o-btn">Abrir ordem de serviço</button><div class="msg" id="o-msg"></div></div>`}
+  <div id="o-list">${empty('Carregando…')}</div>`;
+  if(ME.perfil!=='mecanico'){
+    const {data:veics}=await sel('veiculos','id,placa,ativo','placa');
+    $('o-veic').innerHTML=(veics||[]).filter(v=>v.ativo).map(v=>`<option value="${v.id}">${esc(v.placa)}</option>`).join('');
+    const {data:avs}=await sb.from('avisos').select('id,texto,veiculos(placa)').in('status',['recebido','em_analise','encaminhado']).order('criado_em',{ascending:false});
+    $('o-aviso').innerHTML+= (avs||[]).map(a=>`<option value="${a.id}">${esc(a.veiculos?.placa)} — ${esc(a.texto.slice(0,40))}</option>`).join('');
+    $('o-btn').onclick=async()=>{
+      const desc=$('o-desc').value.trim(),vid=$('o-veic').value;
+      if(!desc||!vid){$('o-msg').className='msg err';$('o-msg').textContent='Escolha o veículo e descreva o serviço';return}
+      const r=await ins('ordens_servico',{veiculo_id:vid,descricao:desc,aviso_id:$('o-aviso').value||null,aberta_por:ME.id});
+      if(r){toast('OS aberta');go('os')}
+    };
+  }
+  const {data:lista}=await sb.from('ordens_servico').select('*, veiculos(placa)').order('aberta_em',{ascending:false}).limit(100);
+  const l=$('o-list');
+  if(!lista||!lista.length){l.innerHTML=empty('Nenhuma OS');return}
+  const FLOW={recebida:'em_analise',em_analise:'aguardando_peca',aguardando_peca:'em_execucao',em_execucao:'concluida'};
+  const LBL={recebida:'▶ Iniciar análise',em_analise:'⏳ Aguardando peça',aguardando_peca:'🔨 Em execução',em_execucao:'✓ Concluir'};
+  l.innerHTML=`<div class="tblwrap"><table><tr><th>Aberta</th><th>Veículo</th><th>Descrição</th><th>Diagnóstico</th><th>Custos</th><th>Status</th><th></th></tr>
+  ${lista.map(o=>`<tr><td>${fmtDT(o.aberta_em)}</td><td>${esc(o.veiculos?.placa)}</td><td>${esc(o.descricao)}</td><td>${esc(o.diagnostico||'—')}</td><td>${o.mao_obra||o.custos?fmtBRL(Number(o.mao_obra||0)+Number(o.custos||0)):'—'}</td><td>${tag(o.status)}</td>
+  <td>${ME.perfil==='mecanico'&&o.status!=='concluida'?`<button class="btn mini" data-osd="${o.id}">✏️ Atualizar</button>`:''}</td></tr>`).join('')}</table></div>`;
+  l.querySelectorAll('[data-osd]').forEach(b=>b.onclick=async()=>{
+    const o=lista.find(x=>x.id===b.dataset.osd);
+    const diag=prompt('Diagnóstico:',o.diagnostico||'');if(diag===null)return;
+    const serv=prompt('Serviço realizado:',o.servico||'');if(serv===null)return;
+    const pecas=prompt('Peças utilizadas:',o.pecas||'');if(pecas===null)return;
+    const mo=prompt('Mão de obra (R$):',o.mao_obra||'');if(mo===null)return;
+    const custos=prompt('Outros custos (R$):',o.custos||'');if(custos===null)return;
+    const novoStatus=FLOW[o.status]||o.status;
+    const r=await upd('ordens_servico',o.id,{diagnostico:diag,servico:serv,pecas:pecas,mao_obra:parseFloat(mo)||null,custos:parseFloat(custos)||null,status:novoStatus,concluida_em:novoStatus==='concluida'?new Date().toISOString():o.concluida_em});
+    if(r){toast('OS atualizada');go('os')}
+  });
+};
+PAGES.usuarios=async el=>{
+  el.innerHTML=`<h1 class="pg">Usuários</h1>
+  <div class="sec"><h3>Vincular login a um perfil</h3>
+  <p class="hint">1) Crie o usuário no Supabase (Dashboard → Authentication → Add user). 2) Cole o ID (UUID) aqui com nome e perfil.</p>
+  <div class="row"><div><label>UUID do usuário</label><input id="u-id" placeholder="xxxxxxxx-xxxx-..."></div><div><label>Nome</label><input id="u-nome"></div></div>
+  <div class="row"><div><label>Perfil</label><select id="u-perfil">${opt([['gerencia','Gerência'],['motorista','Motorista'],['conferente','Conferente'],['mecanico','Mecânico']],null)}</select></div><div><label>&nbsp;</label><button class="btn" id="u-btn">Vincular</button></div></div>
+  <div class="msg" id="u-msg"></div></div>
+  <div id="u-list">${empty('Carregando…')}</div>`;
+  $('u-btn').onclick=async()=>{
+    const id=$('u-id').value.trim(),nome=$('u-nome').value.trim();
+    if(!id||!nome){$('u-msg').className='msg err';$('u-msg').textContent='Informe UUID e nome';return}
+    const {error}=await sb.from('usuarios').upsert({id,nome,perfil:$('u-perfil').value});
+    if(error){$('u-msg').className='msg err';$('u-msg').textContent=err(error)}
+    else{toast('Usuário vinculado');go('usuarios')}
+  };
+  const {data:lista}=await sel('usuarios','*','nome');
+  const l=$('u-list');
+  if(!lista||!lista.length){l.innerHTML=empty('Nenhum usuário vinculado');return}
+  l.innerHTML=`<div class="tblwrap"><table><tr><th>Nome</th><th>Perfil</th><th>Ativo</th><th></th></tr>
+  ${lista.map(u=>`<tr><td><b>${esc(u.nome)}</b></td><td>${tag(u.perfil)}</td><td>${u.ativo?'sim':'não'}</td>
+  <td><button class="btn mini" data-up="${u.id}" data-p="${u.perfil==='motorista'?'conferente':u.perfil==='conferente'?'motorista':'motorista'}">trocar p/ ${u.perfil==='motorista'?'conferente':'motorista'}</button></td></tr>`).join('')}</table></div>`;
+  l.querySelectorAll('[data-up]').forEach(b=>b.onclick=async()=>{
+    if(await upd('usuarios',b.dataset.up,{perfil:b.dataset.p}))go('usuarios');
+  });
+};
+PAGES.auditoria=async el=>{
+  el.innerHTML=`<h1 class="pg">Auditoria</h1><div id="au">${empty('Carregando…')}</div>`;
+  const {data:lista}=await sel('auditoria','*, usuarios(nome)','criado_em');
+  const l=$('au');
+  if(!lista||!lista.length){l.innerHTML=empty('Sem registros');return}
+  l.innerHTML=`<div class="tblwrap"><table><tr><th>Quando</th><th>Quem</th><th>Ação</th></tr>
+  ${lista.slice(0,200).map(a=>`<tr><td>${fmtDT(a.criado_em)}</td><td>${esc(a.usuarios?.nome||'—')}</td><td>${esc(a.acao)}</td></tr>`).join('')}</table></div>`;
+};
+/* ============ notificações ============ */
+PAGES.notif=async el=>{
+  el.innerHTML=`<h1 class="pg">Notificações</h1><div id="nt">${empty('Carregando…')}</div>`;
+  const {data:lista}=await sb.from('notificacoes').select('*').eq('usuario_id',ME.id).order('criado_em',{ascending:false}).limit(50);
+  const l=$('nt');
+  if(!lista||!lista.length){l.innerHTML=empty('Nada por aqui');return}
+  l.innerHTML=lista.map(n=>`<div class="sec" style="padding:12px 16px"><b style="font-size:14px">${esc(n.titulo)}</b><p class="hint">${esc(n.corpo||'')}</p><p style="font-size:11px;color:#666">${fmtDT(n.criado_em)}</p></div>`).join('');
+  await sb.from('notificacoes').update({lida:true}).eq('usuario_id',ME.id).eq('lida',false);
+  $('bdg').classList.add('hide');
+};
+</script>
+</body>
+</html>
