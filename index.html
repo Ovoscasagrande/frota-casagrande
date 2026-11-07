@@ -197,8 +197,12 @@ $('cr-btn').onclick=async()=>{
   try{
     const {error}=await sb.auth.signUp({email,password:pass});
     if(error)throw error;
+    let pendOk=false;
+    try{const {error:e2}=await sb.rpc('auto_cadastro_pendente',{p_nome:nome});pendOk=!e2}catch(_){}
+    try{await sb.auth.signOut()}catch(_){}
     $('card-criar').classList.add('hide');$('card-login').classList.remove('hide');
-    $('li-msg').className='msg ok';$('li-msg').textContent='Conta criada! A gerência vai definir seu perfil — depois feche e reabra o app.';
+    $('li-msg').className='msg ok';
+    $('li-msg').textContent=pendOk?'Conta criada! Aguardando liberação da gerência.':'Conta criada! Faça login — a gerência vai liberar seu perfil.';
   }catch(e){$('cr-msg').className='msg err';$('cr-msg').textContent=err(e)}
   $('cr-btn').disabled=false;
 };
@@ -219,11 +223,16 @@ async function afterLogin(){
   let {data:u,error:e1}=await sb.from('usuarios').select('*').eq('id',user.id).maybeSingle();
   if(e1){toast('Erro ao carregar perfil: '+err(e1))}
   if(!u){
-    // bootstrap: primeiro login vira gerência
     const nome=user.email.split('@')[0].replace(/[._-]/g,' ').toUpperCase();
-    const {data:u2,error:e2}=await sb.rpc('auto_cadastro_gerencia',{p_nome:nome});
-    if(e2){$('li-msg').className='msg err';$('li-msg').textContent='Primeiro acesso: '+err(e2);showLogin();return}
-    u={id:user.id,nome,perfil:'gerencia',email:user.email};
+    // 1º login do sistema vira GERÊNCIA; logins seguintes ficam PENDENTES p/ aprovação
+    const {error:eg}=await sb.rpc('auto_cadastro_gerencia',{p_nome:nome});
+    if(eg){
+      const {error:ep}=await sb.rpc('auto_cadastro_pendente',{p_nome:nome});
+      if(ep){$('li-msg').className='msg err';$('li-msg').textContent='Erro ao registrar: '+err(ep);showLogin();return}
+      u={id:user.id,nome,perfil:'pendente',email:user.email};
+    }else{
+      u={id:user.id,nome,perfil:'gerencia',email:user.email};
+    }
   }
   ME=u;ME.email=user.email;
   if(ME.perfil==='motorista'){
